@@ -128,6 +128,15 @@ public class CraftMetaItemData extends MemoryConfiguration {
     }
 
     /**
+     * Apply this data to an NBTTag, without filtering custom data.
+     *
+     * @param tag The data to apply our map to.
+     */
+    protected void applyToTag(NBTTagCompound tag) {
+        applyToItem(tag, map, false);
+    }
+
+    /**
      * Convert an NBTBase object to an object of the appropriate type for
      * inclusion in our data map.
      * <p>

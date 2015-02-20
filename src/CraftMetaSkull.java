@@ -48,7 +48,7 @@ class CraftMetaSkull extends CraftMetaItem implements SkullMeta {
         } else if (owner instanceof Map) {
             CraftMetaItemData data = CraftMetaItemData.getData((Map) owner);
             NBTTagCompound nbtData = new NBTTagCompound();
-            data.applyToItem(nbtData);
+            data.applyToTag(nbtData);
             profile = GameProfileSerializer.deserialize(nbtData);
         }
     }
