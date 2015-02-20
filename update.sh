@@ -10,6 +10,6 @@ cp ../../src/CraftMetaItem.java Spigot-Server/src/main/java/org/bukkit/craftbukk
 cp ../../src/CraftMetaItemData.java Spigot-Server/src/main/java/org/bukkit/craftbukkit/inventory/.
 cp ../../src/ItemMeta.java Spigot-API/src/main/java/org/bukkit/inventory/meta/.
 cp ../../src/CraftMetaSkull.java Spigot-Server/src/main/java/org/bukkit/craftbukkit/inventory/.
-mvn clean
-mvn install
+/usr/local/maven/bin/mvn clean
+/usr/local/maven/bin/mvn install
 echo PATCH COMPLETE!
