@@ -913,6 +913,7 @@ class CraftMetaItem implements ItemMeta, Repairable {
         }
         // Spigot end
 
+
         Set<String> hideFlags = new HashSet<String>();
         for (ItemFlag hideFlagEnum : getItemFlags()) {
             hideFlags.add(hideFlagEnum.name());

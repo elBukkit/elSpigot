@@ -379,7 +379,8 @@ public class CraftMetaItemData extends MemoryConfiguration {
         for (Map.Entry<String, Object> entry : from.entrySet()) {
             String key = entry.getKey();
             // Skip over well-known tags, but only at the root level.
-            if (CraftMetaItem.ItemMetaKey.BUKKIT_TAGS.contains(key) || CraftMetaItem.SerializableMeta.TYPE_FIELD.equals(key)) {
+            // Skip Bukkit and NBT names, to avoid forward-compatibility issues
+            if (CraftMetaItem.ItemMetaKey.BUKKIT_TAGS.contains(key) || CraftMetaItem.ItemMetaKey.NBT_TAGS.contains(key) || CraftMetaItem.SerializableMeta.TYPE_FIELD.equals(key)) {
                 continue;
             }
 
