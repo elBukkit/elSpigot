@@ -44,6 +44,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
+import org.bukkit.block.BlockState;
 
 // Spigot start
 import static org.spigotmc.ValidateUtils.*;
@@ -118,7 +119,7 @@ class CraftMetaItem implements ItemMeta, Repairable {
         static {
             classMap = ImmutableMap.<Class<? extends CraftMetaItem>, String>builder()
                     .put(CraftMetaBanner.class, "BANNER")
-                    .put(CraftMetaTileEntity.class, "TILE_ENTITY")
+                    .put(CraftMetaBlockState.class, "TILE_ENTITY")
                     .put(CraftMetaBook.class, "BOOK")
                     .put(CraftMetaBookSigned.class, "BOOK_SIGNED")
                     .put(CraftMetaSkull.class, "SKULL")
