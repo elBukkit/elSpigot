@@ -1,0 +1,185 @@
+From a3d397540d86572c0a6d4e2bb847f9f945d0ab8e Mon Sep 17 00:00:00 2001
+From: Antony Riley <antony@cyberiantiger.org>
+Date: Thu, 23 Apr 2015 01:10:52 +0300
+Subject: [PATCH] Optimise tickEntities
+
+
+diff --git a/src/main/java/net/minecraft/server/Entity.java b/src/main/java/net/minecraft/server/Entity.java
+index d6bef0b..0003387 100644
+--- a/src/main/java/net/minecraft/server/Entity.java
++++ b/src/main/java/net/minecraft/server/Entity.java
+@@ -121,6 +121,7 @@ public abstract class Entity implements ICommandListener {
+     public final boolean defaultActivationState;
+     public long activatedTick = Integer.MIN_VALUE;
+     public boolean fromMobSpawner;
++    public Object worldOwner = null;
+     public void inactiveTick() { }
+     // Spigot end
+ 
+diff --git a/src/main/java/net/minecraft/server/World.java b/src/main/java/net/minecraft/server/World.java
+index f9203a7..95a98f4 100644
+--- a/src/main/java/net/minecraft/server/World.java
++++ b/src/main/java/net/minecraft/server/World.java
+@@ -63,7 +63,7 @@ public abstract class World implements IBlockAccess {
+         }
+     };
+     // Spigot end
+-    protected final List<Entity> g = Lists.newArrayList();
++    // protected final List<Entity> g = Lists.newArrayList(); Spigot - Remove
+     public final List<TileEntity> h = Lists.newArrayList();
+     public final List<TileEntity> tileEntityList = Lists.newArrayList();
+     private final List<TileEntity> b = Lists.newArrayList();
+@@ -127,7 +127,6 @@ public abstract class World implements IBlockAccess {
+     public long ticksPerAnimalSpawns;
+     public long ticksPerMonsterSpawns;
+     public boolean populating;
+-    private int tickPosition;
+ 
+     // Spigot start
+     private boolean guardEntityList;
+@@ -140,6 +139,7 @@ public abstract class World implements IBlockAccess {
+     private org.spigotmc.TickLimiter entityLimiter;
+     private org.spigotmc.TickLimiter tileLimiter;
+     private int tileTickPosition;
++    private final Object worldLock = new Object();
+ 
+     public static long chunkToKey(int x, int z)
+     {
+@@ -1067,6 +1067,7 @@ public abstract class World implements IBlockAccess {
+         }
+ 
+         entity.valid = true; // CraftBukkit
++        entity.worldOwner = worldLock; // Spigot
+     }
+ 
+     protected void b(Entity entity) {
+@@ -1123,22 +1124,15 @@ public abstract class World implements IBlockAccess {
+         if (!guardEntityList) { // Spigot - It will get removed after the tick if we are ticking
+         int i = entity.ae;
+         int j = entity.ag;
+-
++            
+         if (entity.ad && this.isChunkLoaded(i, j, true)) {
+             this.getChunkAt(i, j).b(entity);
+         }
+-
+-        // CraftBukkit start - Decrement loop variable field if we've already ticked this entity
+-        int index = this.entityList.indexOf(entity);
+-        if (index != -1) {
+-            if (index <= this.tickPosition) {
+-                this.tickPosition--;
+-            }
+-            this.entityList.remove(index);
+-        }
+-        // CraftBukkit end
++            
++        this.entityList.remove(entity);
+         } // Spigot
+         this.b(entity);
++        entity.worldOwner = null;
+     }
+ 
+     public void addIWorldAccess(IWorldAccess iworldaccess) {
+@@ -1376,11 +1370,12 @@ public abstract class World implements IBlockAccess {
+         }
+ 
+         this.methodProfiler.c("remove");
+-        this.entityList.removeAll(this.g);
++        // this.entityList.removeAll(this.g); - Spigot: merged into main tickEntities loop
+ 
+         int j;
+         int k;
+ 
++        /* Spigot: merged into main tickEntities loop
+         for (i = 0; i < this.g.size(); ++i) {
+             entity = (Entity) this.g.get(i);
+             j = entity.ae;
+@@ -1395,23 +1390,24 @@ public abstract class World implements IBlockAccess {
+         }
+ 
+         this.g.clear();
++        */
+         this.methodProfiler.c("regular");
+ 
+         org.spigotmc.ActivationRange.activateEntities(this); // Spigot
+         timings.entityTick.startTiming(); // Spigot
+         guardEntityList = true; // Spigot
+         // CraftBukkit start - Use field for loop variable
+-        int entitiesThisCycle = 0;
+-        if (tickPosition < 0) tickPosition = 0;
+-        for (entityLimiter.initTick();
+-                entitiesThisCycle < entityList.size() && (entitiesThisCycle % 10 == 0 || entityLimiter.shouldContinue());
+-                tickPosition++, entitiesThisCycle++) {
+-            tickPosition = (tickPosition < entityList.size()) ? tickPosition : 0;
+-            entity = (Entity) this.entityList.get(this.tickPosition);
++        List<Entity> tickedEntities = new ArrayList<Entity>(); // Spigot
++        int tickPosition; // Spigot
++        for (entityLimiter.initTick(), tickPosition = 0;
++                tickPosition < entityList.size() && (tickPosition % 10 == 0 || entityLimiter.shouldContinue());
++                tickPosition++) {
++            entity = (Entity) this.entityList.get(tickPosition);
+             // CraftBukkit end
++            while (true) {
+             if (entity.vehicle != null) {
+                 if (!entity.vehicle.dead && entity.vehicle.passenger == entity) {
+-                    continue;
++                    break;
+                 }
+ 
+                 entity.vehicle.passenger = null;
+@@ -1419,7 +1415,7 @@ public abstract class World implements IBlockAccess {
+             }
+ 
+             this.methodProfiler.a("tick");
+-            if (!entity.dead) {
++            if (!entity.dead && entity.worldOwner == worldLock) {
+                 try {
+                     SpigotTimings.tickEntityTimer.startTiming(); // Spigot
+                     this.g(entity);
+@@ -1431,25 +1427,27 @@ public abstract class World implements IBlockAccess {
+                     throw new ReportedException(crashreport);
+                 }
+             }
++            break;
++            }
+ 
+             this.methodProfiler.b();
+             this.methodProfiler.a("remove");
+-            if (entity.dead) {
++            if (entity.dead || entity.worldOwner != worldLock) {
+                 j = entity.ae;
+                 k = entity.ag;
+                 if (entity.ad && this.isChunkLoaded(j, k, true)) {
+                     this.getChunkAt(j, k).b(entity);
+                 }
+-
+-                guardEntityList = false; // Spigot
+-                this.entityList.remove(this.tickPosition--); // CraftBukkit - Use field for loop variable
+-                guardEntityList = true; // Spigot
+                 this.b(entity);
++            } else {
++                tickedEntities.add(entity);
+             }
+ 
+             this.methodProfiler.b();
+         }
+         guardEntityList = false; // Spigot
++        entityList.subList(0, tickPosition).clear(); // Spigot
++        entityList.addAll(tickedEntities); // Spigot
+ 
+         timings.entityTick.stopTiming(); // Spigot
+         this.methodProfiler.c("blockEntities");
+@@ -2656,7 +2654,9 @@ public abstract class World implements IBlockAccess {
+     }
+ 
+     public void c(Collection<Entity> collection) {
+-        this.g.addAll(collection);
++        for (Entity e : collection) {
++            e.worldOwner = null;
++        }
+     }
+ 
+     public boolean a(Block block, BlockPosition blockposition, boolean flag, EnumDirection enumdirection, Entity entity, ItemStack itemstack) {
+-- 
+1.9.1
+
